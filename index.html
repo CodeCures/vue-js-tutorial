@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vue Tutorial</title>
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <div class="cart">
+          Cart({{ cart.length }})
+      </div>
+      <product :premium="premium" @add-to-cart="updateCart" @remove-from-cart="deleteCartItem"></product>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script>
+      var eventBus = new Vue();
+      Vue.component("product", {
+        props: {
+            premium: {
+                type: Boolean,
+                required: true
+            }
+        },
+        template: `
+            <div class="product">
+                <div class="product-image">
+                    <img :src="image">
+                </div>
+                <div class="product-info">
+                    <h1 :class="{ canceledText: !inStock }">{{ title }}</h1>
+                    <p class="product-description">{{ description }}</p>
+                    <a v-if="inStock" :href="url">Buy Now</a>
+                    <span v-else>out of stuck</span>
+                    <ul>
+                        <li v-for="detail in details" :key="detail" v-text="detail"></li>
+                    </ul>
+                    <p>Shipping: {{ shipping }}</p>
+                    <!-- variants -->
+                    <div v-for="(variant, index) in variants" 
+                        :key="variant.variantID"
+                        class="color-box"
+                        :style="{backgroundColor: variant.variantColor}"
+                        @mouseover="updateProduct(index)">
+                    </div>
+    
+                    <button @click="addToCart" 
+                    :disabled="!inStock" 
+                    :class="{ disabledButton: !inStock }">Add TO Cart</button>
+
+                    <button @click="decrementCart" 
+                    :disabled="!inStock" 
+                    :class="{ disabledButton: !inStock }">Add TO Cart</button>
+
+                    <product-tab :reviews="reviews" />
+                </div>
+            </div>
+            `,
+        data() {
+          return {
+            product: "T-Shirt",
+            brand: "Adidas",
+            description:
+              "Lorem ipsum dolor sit amet consectetur adipisicing elit. Explicabo, ut.",
+            url: "https://google.com",
+            details: ["20% Cotton", "80% Polyester", "Gender-nuetral"],
+            selectedVariant: 0,
+            variants: [
+              {
+                variantID: 12389012,
+                variantColor: "green",
+                variantImage: "./imgs/vmSocks-green-onWhite.jpg",
+                variantQuantity: 100,
+              },
+              {
+                variantID: 827948923,
+                variantColor: "blue",
+                variantImage: "./imgs/vmSocks-blue-onWhite.jpg",
+                variantQuantity: 0,
+              },
+            ],
+            onSale: true,
+            reviews: []
+          };
+        },
+        methods: {
+          addToCart: function () {
+            this.$emit('add-to-cart', this.variants[this.selectedVariant].variantID);
+          },
+          decrementCart: function () {
+            this.$emit('remove-from-cart', this.variants[this.selectedVariant].variantID);
+          },
+          updateProduct: function (index) {
+            this.selectedVariant = index;
+          },
+        },
+        computed: {
+          title() {
+            if (this.onSale) {
+              return this.brand + " " + this.product;
+            }
+          },
+          image() {
+            return this.variants[this.selectedVariant].variantImage;
+          },
+          inStock() {
+            return this.variants[this.selectedVariant].variantQuantity;
+          },
+          shipping(){
+              return this.premium ? 'Free' : 'NGN 3,000';
+          }
+        },
+        mounted(){
+          eventBus.$on('review-submitted', productReview => this.reviews.push(productReview));
+        }
+      });
+
+      Vue.component('product-review', {
+        template: `
+          <form class="review-form" @submit.prevent="onSubmit">
+            <div v-if="errors.length">
+              <h3>Please correct the following errors!</h3>
+              <ul>
+                <li v-for="error in errors">{{ error }}</li>
+              </ul>
+            </div>
+            <div>
+              <label for="name">Name: {{ name }}</label>
+              <input type="text" name="" id="name" v-model="name">
+            </div>
+            <div>
+              <label for="review">Review</label>
+              <textarea rows="5" cols="5" id="review" v-model="review"></textarea>
+            </div>
+            <div>
+              <label for="rating">Rating</label>
+              <select id="rating" v-model="rating">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+              </select>
+            </div>
+            <div>
+              <label for="recommend">Recommed Product
+                <input type="checkbox" id="recommend" v-model="recommended">
+              </label>
+            </div>
+            <div>
+              <input type="submit" name="submit" value="submit">
+            </div>
+          </form>
+        `,
+        data(){
+          return {
+            name: null,
+            review: null,
+            rating: null,
+            recommended: null,
+            errors: []
+          }
+        },
+        methods: {
+          onSubmit(){
+            if(this.name && this.review && this.rating){
+              let productReview = {
+                name: this.name,
+                review: this.review,
+                rating: this.rating,
+                recommended: this.recommended
+              }
+              eventBus.$emit('review-submitted', productReview);
+              this.name = null;
+              this.review = null;
+              this.rating = null;
+              this.recommended = null;
+            }else{
+              if(!this.name) this.errors.push("Name Required");
+              if(!this.review) this.errors.push("review Required");
+              if(!this.rating) this.errors.push("rating Required");
+            }
+          }
+        }
+      });
+
+      Vue.component('product-tab', {
+        props: {
+          reviews: {
+            type: Array,
+            required: true
+          }
+        },
+        template: `
+          <div>
+            <span class="tab"
+              :class="{ activeTab: selectedTab === tab }"
+              v-for="(tab, index) in tabs" :key="index"
+
+            @click="selectedTab = tab">{{ tab }}</span>
+            <div v-show="selectedTab === 'Reviews'">
+              <h2>Reviews</h2>
+              <p v-if="!reviews.length">There is no reviews yet.</p>
+              <ul>
+                <li v-for="review in reviews">
+                  <p>{{ review.name }}</p>
+                  <p>Rating: {{ review.rating }}</p>
+                  <p>{{ review.review }}</p>
+                  <p>Recommended: 
+                    <span v-if="review.recommended">True</span>
+                    <span v-else>False</span>
+                  </p>
+                </li>
+              </ul>
+            </div>
+            <product-review v-show="selectedTab === 'Make a Review'" />
+          </div>
+        `,
+        data(){
+          return {
+            tabs: ['Reviews', 'Make a Review'],
+            selectedTab: 'Reviews'
+          }
+        }
+      });
+      
+      var app = new Vue({
+        el: "#app",
+        data: {
+          premium: false,
+          cart: [],
+        },
+        methods: {
+          updateCart(id){
+            this.cart.push(id);
+          },
+          deleteCartItem(id){
+            this.cart.pop(id)
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
